@@ -1,0 +1,10 @@
+services:
+  text2image:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - SAVE_IMAGES_TO_DISK=true
+    volumes:
+      - ./images:/images
+    restart: always
