@@ -1,4 +1,4 @@
-# GeekMagic Text2Image API
+# Text2Image (GeekMagic HTML renderer)
 
 This project provides a simple API to render HTML content into JPG images. It is primarily designed to work with the **[GeekMagic Home Assistant Integration](https://github.com/aydarik/hass-geekmagic)** to verify and generate layouts for GeekMagic.
 
@@ -35,7 +35,7 @@ You can also run this service standalone using Docker.
 ```yaml
 services:
   text2image:
-    image: docker.io/aydarik/text2image
+    image: ghcr.io/aydarik/text2image:${ARCH:-amd64}
     container_name: text2image
     ports:
       - "8000:8000"
