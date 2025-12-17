@@ -41,7 +41,7 @@ You can also run this service standalone using Docker.
 ```yaml
 services:
   text2image:
-    image: ghcr.io/aydarik/text2image:${ARCH:-amd64}
+    image: ghcr.io/aydarik/text2image
     container_name: text2image
     ports:
       - "8000:8000"
