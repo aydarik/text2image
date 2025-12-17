@@ -12,4 +12,4 @@ ports:
   8000/tcp: 8000
 options: {}
 schema: {}
-image: "ghcr.io/aydarik/text2image:{arch}"
+image: "ghcr.io/aydarik/text2image"
