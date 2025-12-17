@@ -13,13 +13,13 @@ This project provides a simple API to render HTML content into JPG images. It is
 
 This project can be installed as a Home Assistant Add-on.
 
-[![Add to Home Assistant](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Faydarik%2Ftext2image)
+[![Add to Home Assistant](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Faydarik%2Fhass-addons)
 
 ### Installation
 
 1.  Add the repository URL to your Home Assistant Add-on Store repositories:
-    `https://github.com/aydarik/text2image`
-2.  Install the "GeekMagic Text2Image" add-on.
+    `https://github.com/aydarik/hass-addons`
+2.  Install the "Text2Image" add-on.
 3.  Start the add-on.
 
 ### Configuration
