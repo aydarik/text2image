@@ -9,6 +9,9 @@ This project provides a simple API to render HTML content into JPG images. It is
 -   **FastAPI**: Built with FastAPI for high performance.
 -   **Caching**: Caches generated images based on request content to speed up subsequent requests.
 
+<details>
+<summary>Home Assistant Add-on (in progress)</summary>
+
 ## Home Assistant Add-on
 
 This project can be installed as a Home Assistant Add-on.
@@ -25,6 +28,9 @@ This project can be installed as a Home Assistant Add-on.
 ### Configuration
 
 The add-on runs on port `8000` by default. No additional configuration is usually required.
+</details>
+
+> **Note:** The Home Assistant Add-on approach is not yet functional. Please track progress at [issues/1](https://github.com/aydarik/text2image/issues/1). Contributions are welcome! For now, consider using the Docker approach or an externally hosted service like `https://text2image.gumerbaev.ru/render`.
 
 ## Docker Usage
 
