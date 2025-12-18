@@ -24,7 +24,9 @@ This project can be installed as a Home Assistant Add-on.
 
 ### Configuration
 
-The add-on runs on port `8000` by default. No additional configuration is usually required.
+The add-on runs on port `8000` by default.
+
+> Remember to reconfigure the **Render URL** in the [GeegMagic integration](https://github.com/aydarik/hass-geekmagic) settings to point to your local instance (e.g., `http://0.0.0.0:8000/render`).
 
 ## Docker Usage
 
