@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/github/license/aydarik/text2image)](/LICENSE) [![Release](https://img.shields.io/github/v/release/aydarik/text2image)](https://github.com/aydarik/text2image/releases)
 
-![Logo](https://github.com/aydarik/text2image/blob/main/logo.png?raw=true)
+![Logo](/logo.png)
 
 This project provides a simple API to render HTML content into JPG images. It is primarily designed to work with the **[GeekMagic Home Assistant Integration](https://github.com/aydarik/hass-geekmagic)** to verify and generate layouts for GeekMagic.
 
