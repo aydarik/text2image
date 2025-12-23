@@ -2,6 +2,8 @@
 
 [![License](https://img.shields.io/github/license/aydarik/text2image)](/LICENSE) [![Release](https://img.shields.io/github/v/release/aydarik/text2image)](https://github.com/aydarik/text2image/releases)
 
+![Logo](https://github.com/aydarik/text2image/blob/main/logo.png?raw=true)
+
 This project provides a simple API to render HTML content into JPG images. It is primarily designed to work with the **[GeekMagic Home Assistant Integration](https://github.com/aydarik/hass-geekmagic)** to verify and generate layouts for GeekMagic.
 
 ## Features
@@ -28,7 +30,7 @@ This project can be installed as a Home Assistant Add-on.
 
 The add-on runs on port `8000` by default.
 
-> Remember to reconfigure the **Render URL** in the [GeegMagic integration](https://github.com/aydarik/hass-geekmagic) settings to point to your local instance (e.g., `http://0.0.0.0:8000/render`).
+> Remember to reconfigure the **Render URL** in the [GeegMagic integration](https://github.com/aydarik/hass-geekmagic) settings to point to your local instance (e.g., `http://127.0.0.1:8000/render`).
 
 ## Docker Usage
 
