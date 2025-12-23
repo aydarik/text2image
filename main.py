@@ -56,12 +56,20 @@ async def render_html(request: RenderRequest):
                 cached_bytes = f.read()
             return Response(content=cached_bytes, media_type="image/jpeg")
 
-        print(f"Cache miss: generating {file_path}")
+        print(f"Generating: {file_path}")
         async with async_playwright() as p:
             browser = await p.chromium.launch()
             page = await browser.new_page(viewport={"width": request.width, "height": request.height})
             await page.set_content(request.html)
-            screenshot_bytes = await page.screenshot(type="jpeg")
+
+            if ("window.renderReady" in request.html):
+                # Wait until widget JS finished rendering
+                await page.wait_for_function(
+                    "window.renderReady === true",
+                    timeout=5000
+                )
+
+            screenshot_bytes = await page.screenshot(type="jpeg", quality=90)
             await browser.close()
             
             # Save to disk if caching is enabled

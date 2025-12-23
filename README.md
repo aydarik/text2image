@@ -76,6 +76,8 @@ docker run -p 8000:8000 text2image
 }
 ```
 
+> **Note:** If the HTML contains long-running JavaScript functions, add `window.renderReady = true` to the end of the function to signal that the rendering is complete.
+
 **Response:** Returns a `image/jpeg` file.
 
 ## License
