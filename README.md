@@ -1,5 +1,7 @@
 # Text2Image (GeekMagic HTML renderer)
 
+[![License](https://img.shields.io/github/license/aydarik/text2image)](/LICENSE) [![Release](https://img.shields.io/github/v/release/aydarik/text2image)](https://github.com/aydarik/text2image/releases)
+
 This project provides a simple API to render HTML content into JPG images. It is primarily designed to work with the **[GeekMagic Home Assistant Integration](https://github.com/aydarik/hass-geekmagic)** to verify and generate layouts for GeekMagic.
 
 ## Features
@@ -41,7 +43,15 @@ services:
     container_name: text2image
     ports:
       - "8000:8000"
+    environment:
+      - CACHE_ENABLED=true  # Optional: set to 'false' to disable caching
 ```
+
+### Environment Variables
+
+| Variable | Description | Default |
+| :--- | :--- | :--- |
+| `CACHE_ENABLED` | Enable or disable image caching. | `true` |
 
 ### Manual Run
 
@@ -65,3 +75,7 @@ docker run -p 8000:8000 text2image
 ```
 
 **Response:** Returns a `image/jpeg` file.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](/LICENSE) file for details.

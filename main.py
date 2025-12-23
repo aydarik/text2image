@@ -41,13 +41,16 @@ async def render_html(request: RenderRequest):
         import os
         os.makedirs(output_dir, exist_ok=True)
         
+        # Check if caching is enabled (enabled by default)
+        cache_enabled = os.getenv("CACHE_ENABLED", "true").lower() == "true"
+        
         filename = f"{req_hash}.jpg"
         file_path = os.path.join(output_dir, filename)
         
         from fastapi.responses import Response
 
         # Check if file exists in cache
-        if os.path.exists(file_path):
+        if cache_enabled and os.path.exists(file_path):
             print(f"Cache hit: {file_path}")
             with open(file_path, "rb") as f:
                 cached_bytes = f.read()
@@ -61,9 +64,10 @@ async def render_html(request: RenderRequest):
             screenshot_bytes = await page.screenshot(type="jpeg")
             await browser.close()
             
-            # Save to disk (always save to cache now)
-            with open(file_path, "wb") as f:
-                f.write(screenshot_bytes)
+            # Save to disk if caching is enabled
+            if cache_enabled:
+                with open(file_path, "wb") as f:
+                    f.write(screenshot_bytes)
             
             return Response(content=screenshot_bytes, media_type="image/jpeg")
     except Exception as e:
