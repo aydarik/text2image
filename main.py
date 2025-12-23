@@ -3,11 +3,21 @@ from pydantic import BaseModel
 from playwright.async_api import async_playwright
 import uvicorn
 import io
+import time
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(levelname)-7s %(asctime)s %(message)s')
+logger = logging.getLogger(__name__)
+
+START_TIME = time.time()
+render_count = 0
+total_execution_time = 0.0
 
 app = FastAPI(
     title="HTML to JPG API",
     description="An API to render HTML content as a JPG image using Playwright.",
-    version="1.0.0"
+    version="1.1.0"
 )
 
 class RenderRequest(BaseModel):
@@ -27,6 +37,8 @@ class RenderRequest(BaseModel):
     }
 )
 async def render_html(request: RenderRequest):
+    global render_count, total_execution_time
+    start_render = time.time()
     try:
         # Calculate hash of the request
         import hashlib
@@ -51,12 +63,12 @@ async def render_html(request: RenderRequest):
 
         # Check if file exists in cache
         if cache_enabled and os.path.exists(file_path):
-            print(f"Cache hit: {file_path}")
+            logger.info(f"Cache hit: {file_path}")
             with open(file_path, "rb") as f:
                 cached_bytes = f.read()
             return Response(content=cached_bytes, media_type="image/jpeg")
 
-        print(f"Generating: {file_path}")
+        logger.info(f"Generating: {file_path}")
         async with async_playwright() as p:
             browser = await p.chromium.launch()
             page = await browser.new_page(viewport={"width": request.width, "height": request.height})
@@ -77,9 +89,30 @@ async def render_html(request: RenderRequest):
                 with open(file_path, "wb") as f:
                     f.write(screenshot_bytes)
             
+            # Update metrics
+            render_count += 1
+            total_execution_time += (time.time() - start_render) * 1000
+            
             return Response(content=screenshot_bytes, media_type="image/jpeg")
     except Exception as e:
+        logger.error(f"Error rendering HTML: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get(
+    "/status",
+    summary="Get service status",
+    description="Returns version, service start time, render count, and average render time (ms)."
+)
+async def get_status():
+    status = {
+        "version": app.version,
+        "start_time": int(START_TIME),
+        "render_count": render_count,
+        "render_avg": int(total_execution_time / render_count) if render_count > 0 else 0
+    }
+    logger.info(f"Service status: {status}")
+    return status
+
 if __name__ == "__main__":
+    logger.info("Starting service...")
     uvicorn.run(app, host="0.0.0.0", port=8000)
