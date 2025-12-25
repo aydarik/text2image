@@ -68,7 +68,6 @@ async def render_html(request: RenderRequest):
                 cached_bytes = f.read()
             return Response(content=cached_bytes, media_type="image/jpeg")
 
-        logger.info(f"Generating: {file_path}")
         async with async_playwright() as p:
             browser = await p.chromium.launch()
             page = await browser.new_page(viewport={"width": request.width, "height": request.height})
@@ -89,10 +88,13 @@ async def render_html(request: RenderRequest):
                 with open(file_path, "wb") as f:
                     f.write(screenshot_bytes)
             
+            execution_time = (time.time() - start_render) * 1000
+            logger.info(f"Generated in {int(execution_time)} ms: {file_path}")
+            
             # Update metrics
             render_count += 1
-            total_execution_time += (time.time() - start_render) * 1000
-            
+            total_execution_time += execution_time
+
             return Response(content=screenshot_bytes, media_type="image/jpeg")
     except Exception as e:
         logger.error(f"Error rendering HTML: {str(e)}")
