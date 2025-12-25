@@ -17,13 +17,14 @@ total_execution_time = 0.0
 app = FastAPI(
     title="HTML to JPG API",
     description="An API to render HTML content as a JPG image using Playwright.",
-    version="1.1.0"
+    version="1.2.0"
 )
 
 class RenderRequest(BaseModel):
     html: str
     width: int = 240
     height: int = 240
+    cache: bool = True
 
 @app.post(
     "/render",
@@ -54,7 +55,7 @@ async def render_html(request: RenderRequest):
         os.makedirs(output_dir, exist_ok=True)
         
         # Check if caching is enabled (enabled by default)
-        cache_enabled = os.getenv("CACHE_ENABLED", "true").lower() == "true"
+        cache_enabled = request.cache
         
         filename = f"{req_hash}.jpg"
         file_path = os.path.join(output_dir, filename)

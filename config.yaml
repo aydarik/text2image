@@ -1,6 +1,6 @@
 ---
 name: "Text2Image"
-version: "1.1.0"
+version: "1.2.0"
 slug: "text2image"
 description: "Renders HTML to JPG images using Playwright"
 url: "https://github.com/aydarik/text2image"
