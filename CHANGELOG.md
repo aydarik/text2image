@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.2.1] - 2026-01-04
+
+### Changed
+- Improved performance by keeping the browser instance persistent across requests.
+
 ## [1.2.0] - 2025-12-25
 
 ### Changed
