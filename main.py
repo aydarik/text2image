@@ -82,7 +82,7 @@ async def render_html(request: RenderRequest):
 
         # Check if file exists in cache
         if cache_enabled and os.path.exists(file_path):
-            logger.info(f"Cache hit: {file_path}")
+            logger.info(f"Cache hit: {req_hash}")
             with open(file_path, "rb") as f:
                 cached_bytes = f.read()
             return Response(content=cached_bytes, media_type="image/jpeg")
@@ -111,7 +111,10 @@ async def render_html(request: RenderRequest):
                     f.write(screenshot_bytes)
             
             execution_time = (time.time() - start_render) * 1000
-            logger.info(f"Generated in {int(execution_time)} ms: {file_path}")
+            log_msg = f"Generated in {int(execution_time)} ms"
+            if cache_enabled:
+                log_msg += f": {req_hash}"
+            logger.info(log_msg)
             
             # Update metrics
             render_count += 1
@@ -141,5 +144,4 @@ async def get_status():
     return status
 
 if __name__ == "__main__":
-    logger.info("Starting service...")
     uvicorn.run(app, host="0.0.0.0", port=8000)
