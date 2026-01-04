@@ -6,6 +6,8 @@ import io
 import time
 import logging
 
+from contextlib import asynccontextmanager
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(levelname)-7s %(asctime)s %(message)s')
 logger = logging.getLogger(__name__)
@@ -14,10 +16,26 @@ START_TIME = time.time()
 render_count = 0
 total_execution_time = 0.0
 
+# Global playwright and browser objects
+playwright_instance = None
+browser_instance = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global playwright_instance, browser_instance
+    logger.info("Starting browser...")
+    playwright_instance = await async_playwright().start()
+    browser_instance = await playwright_instance.chromium.launch()
+    yield
+    logger.info("Stopping browser...")
+    await browser_instance.close()
+    await playwright_instance.stop()
+
 app = FastAPI(
     title="HTML to JPG API",
     description="An API to render HTML content as a JPG image using Playwright.",
-    version="1.2.0"
+    version="1.2.1",
+    lifespan=lifespan
 )
 
 class RenderRequest(BaseModel):
@@ -69,9 +87,13 @@ async def render_html(request: RenderRequest):
                 cached_bytes = f.read()
             return Response(content=cached_bytes, media_type="image/jpeg")
 
-        async with async_playwright() as p:
-            browser = await p.chromium.launch()
-            page = await browser.new_page(viewport={"width": request.width, "height": request.height})
+        if not browser_instance:
+            raise HTTPException(status_code=500, detail="Browser not initialized")
+
+        # Create a new context and page for each request to ensure thread safety (isolation)
+        context = await browser_instance.new_context(viewport={"width": request.width, "height": request.height})
+        page = await context.new_page()
+        try:
             await page.set_content(request.html)
 
             if ("window.renderReady" in request.html):
@@ -82,7 +104,6 @@ async def render_html(request: RenderRequest):
                 )
 
             screenshot_bytes = await page.screenshot(type="jpeg", quality=90)
-            await browser.close()
             
             # Save to disk if caching is enabled
             if cache_enabled:
@@ -97,6 +118,9 @@ async def render_html(request: RenderRequest):
             total_execution_time += execution_time
 
             return Response(content=screenshot_bytes, media_type="image/jpeg")
+        finally:
+            # Always close the page and context to free resources
+            await context.close()
     except Exception as e:
         logger.error(f"Error rendering HTML: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

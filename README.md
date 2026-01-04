@@ -54,6 +54,12 @@ docker build -t text2image .
 docker run -p 8000:8000 text2image
 ```
 
+or
+
+```bash
+docker compose up --build
+```
+
 ## API Usage
 
 ### Endpoint: `/render` [POST]
