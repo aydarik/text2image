@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.3.1] - 2026-03-05
+
+### Fixed
+- /render endpoint documentation and validation.
+
 ## [1.3.0] - 2026-03-05
 
 ### Added

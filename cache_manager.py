@@ -48,7 +48,7 @@ async def get_cache_manager(request: Request, page: int = 1, auth: bool = Depend
     files.sort(key=lambda x: x["ctime"], reverse=True)
     
     # Pagination
-    PAGE_SIZE = 100
+    PAGE_SIZE = 300
     start = (page - 1) * PAGE_SIZE
     end = start + PAGE_SIZE
     paginated_files = files[start:end]

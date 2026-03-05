@@ -39,7 +39,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="HTML to JPG API",
     description="An API to render HTML content as a JPG image using Playwright.",
-    version="1.3.0",
+    version="1.3.1",
     lifespan=lifespan
 )
 
@@ -66,13 +66,11 @@ class RenderRequest(BaseModel):
         }
     }
 )
-async def render_html(req: Request):
+async def render_html(request: RenderRequest, req: Request):
     global render_count, total_execution_time
     start_render = time.time()
     try:
-        # Extract and parse payload from request
-        payload = await req.json()
-        request = RenderRequest(**payload)
+        # FastAPI handles the parsing and validation of the request body into 'request'
         
         request_ip = (
             req.headers.get("cf-connecting-ip")
