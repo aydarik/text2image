@@ -1,12 +1,17 @@
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import Response
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from playwright.async_api import async_playwright
 import uvicorn
-import io
 import time
 import logging
+import hashlib
+import json
+import os
 
 from contextlib import asynccontextmanager
+import cache_manager
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(levelname)-7s %(asctime)s %(message)s')
@@ -34,9 +39,15 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="HTML to JPG API",
     description="An API to render HTML content as a JPG image using Playwright.",
-    version="1.2.1",
+    version="1.3.0",
     lifespan=lifespan
 )
+
+# Mount images directory for static access
+app.mount("/images_static", StaticFiles(directory="images"), name="images_static")
+
+# Include cache management router
+app.include_router(cache_manager.router)
 
 class RenderRequest(BaseModel):
     html: str
@@ -72,16 +83,12 @@ async def render_html(req: Request):
         logger.info(f"Request {int(ip_count)} from IP: {request_ip}")
 
         # Calculate hash of the request
-        import hashlib
-        import json
-        
         req_dict = request.dict()
         # Sort keys to ensure consistent order for hashing
         req_str = json.dumps(req_dict, sort_keys=True)
         req_hash = hashlib.sha256(req_str.encode("utf-8")).hexdigest()
         
         output_dir = "images"
-        import os
         os.makedirs(output_dir, exist_ok=True)
         
         # Check if caching is enabled (enabled by default)
@@ -90,8 +97,6 @@ async def render_html(req: Request):
         filename = f"{req_hash}.jpg"
         file_path = os.path.join(output_dir, filename)
         
-        from fastapi.responses import Response
-
         # Check if file exists in cache
         if cache_enabled and os.path.exists(file_path):
             logger.info(f"Cache hit: {req_hash}")

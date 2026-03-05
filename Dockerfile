@@ -10,6 +10,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN playwright install chromium
 
 COPY main.py .
+COPY cache_manager.py .
 
 EXPOSE 8000
 

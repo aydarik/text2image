@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.3.0] - 2026-03-05
+
+### Added
+- Cache management.
+
 ## [1.2.1] - 2026-01-04
 
 ### Changed
