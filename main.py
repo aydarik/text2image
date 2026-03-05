@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 from playwright.async_api import async_playwright
 import uvicorn
@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO, format='%(levelname)-7s %(asctime)s %(me
 logger = logging.getLogger(__name__)
 
 START_TIME = time.time()
-render_count = 0
+render_count = {}  # Maps IP address to count
 total_execution_time = 0.0
 
 # Global playwright and browser objects
@@ -55,10 +55,22 @@ class RenderRequest(BaseModel):
         }
     }
 )
-async def render_html(request: RenderRequest):
+async def render_html(req: Request):
     global render_count, total_execution_time
     start_render = time.time()
     try:
+        # Extract and parse payload from request
+        payload = await req.json()
+        request = RenderRequest(**payload)
+        
+        request_ip = (
+            req.headers.get("cf-connecting-ip")
+            or req.headers.get("x-forwarded-for", "").split(",")[0]
+            or req.client.host
+        )
+        ip_count = render_count.get(request_ip, 0) + 1
+        logger.info(f"Request {int(ip_count)} from IP: {request_ip}")
+
         # Calculate hash of the request
         import hashlib
         import json
@@ -117,7 +129,7 @@ async def render_html(request: RenderRequest):
             logger.info(log_msg)
             
             # Update metrics
-            render_count += 1
+            render_count[request_ip] = ip_count
             total_execution_time += execution_time
 
             return Response(content=screenshot_bytes, media_type="image/jpeg")
@@ -134,11 +146,12 @@ async def render_html(request: RenderRequest):
     description="Returns version, service start time, render count, and average render time (ms)."
 )
 async def get_status():
+    total_renders = sum(render_count.values())
     status = {
         "version": app.version,
         "start_time": int(START_TIME),
-        "render_count": render_count,
-        "render_avg": int(total_execution_time / render_count) if render_count > 0 else 0
+        "render_count": total_renders,
+        "render_avg": int(total_execution_time / total_renders) if total_renders > 0 else 0
     }
     logger.info(f"Service status: {status}")
     return status
