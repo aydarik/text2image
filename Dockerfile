@@ -11,6 +11,7 @@ RUN playwright install chromium
 
 COPY main.py .
 COPY cache_manager.py .
+COPY templates/ ./templates/
 
 EXPOSE 8000
 
