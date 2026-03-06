@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.3.2] - 2026-03-06
+
+### Changed
+- Split cached images by IP address.
+
 ## [1.3.1] - 2026-03-05
 
 ### Fixed
