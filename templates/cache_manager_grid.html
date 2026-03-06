@@ -1,0 +1,16 @@
+{% for img in images %}
+<div class="card">
+    <img src="/images_static/{{ img.ip }}/{{ img.name }}" alt="{{ img.name }}" loading="lazy">
+    <div class="card-info">
+        <div style="color: var(--accent); margin-bottom: 4px;">{{ img.ip }}</div>
+        <div>{{ img.name[:20] }}...</div>
+        <div style="margin-top: 4px;">{{ img.date }}</div>
+    </div>
+</div>
+{% endfor %}
+
+{% if has_more %}
+<div id="load-more-trigger" data-page="{{ page + 1 }}" data-has-more="true" style="height: 10px; width: 100%;"></div>
+{% else %}
+<div id="load-more-trigger" data-has-more="false" style="display: none;"></div>
+{% endif %}

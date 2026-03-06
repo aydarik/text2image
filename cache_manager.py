@@ -29,13 +29,24 @@ def check_auth(credentials: HTTPBasicCredentials = Depends(security)):
 
 
 @router.get("/cache", response_class=HTMLResponse)
-async def get_cache_manager(request: Request, page: int = 1, ip: str = None, auth: bool = Depends(check_auth)):
+async def get_cache_manager(request: Request, page: int = 1, ip: str = None, ajax: bool = False,
+                            auth: bool = Depends(check_auth)):
     output_dir = "images"
 
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
     all_ips = [d for d in os.listdir(output_dir) if os.path.isdir(os.path.join(output_dir, d))]
+
+    if not ajax:
+        return templates.TemplateResponse(
+            "cache_manager.html",
+            {
+                "request": request,
+                "all_ips": sorted(all_ips),
+                "current_ip": ip or "all"
+            }
+        )
 
     files = []
     search_dirs = [os.path.join(output_dir, ip)] if ip and ip != "all" \
@@ -60,20 +71,19 @@ async def get_cache_manager(request: Request, page: int = 1, ip: str = None, aut
     files.sort(key=lambda x: x["ctime"], reverse=True)
 
     # Pagination
-    PAGE_SIZE = 300
+    PAGE_SIZE = 120
     start = (page - 1) * PAGE_SIZE
     end = start + PAGE_SIZE
     paginated_files = files[start:end]
     has_more = len(files) > end
 
     return templates.TemplateResponse(
-        "cache_manager.html",
+        "cache_manager_grid.html",
         {
             "request": request,
             "images": paginated_files,
             "page": page,
             "has_more": has_more,
-            "all_ips": sorted(all_ips),
             "current_ip": ip or "all"
         }
     )

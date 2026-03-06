@@ -161,32 +161,87 @@
         </div>
     </header>
 
-    {% if not images %}
-    <div class="empty">No images found in cache.</div>
-    {% else %}
-    <div class="grid">
-        {% for img in images %}
-        <div class="card">
-            <img src="/images_static/{{ img.ip }}/{{ img.name }}" alt="{{ img.name }}" loading="lazy">
-            <div class="card-info">
-                <div style="color: var(--accent); margin-bottom: 4px;">{{ img.ip }}</div>
-                <div>{{ img.name[:20] }}...</div>
-                <div style="margin-top: 4px;">{{ img.date }}</div>
-            </div>
-        </div>
-        {% endfor %}
-    </div>
-    {% endif %}
-
-    <div class="pagination">
-        {% if page > 1 %}
-        <a href="/cache?page={{ page - 1 }}&ip={{ current_ip }}">Previous</a>
-        {% endif %}
-        {% if has_more %}
-        <a href="/cache?page={{ page + 1 }}&ip={{ current_ip }}">Next</a>
-        {% endif %}
+    <div class="grid" id="image-grid">
+        <div id="load-more-trigger" data-page="1" data-has-more="true" style="height: 10px; width: 100%;"></div>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const grid = document.getElementById('image-grid');
+        if (!grid) return;
+
+        let loading = false;
+        const currentIp = "{{ current_ip }}";
+
+        const observerOptions = {
+            root: null,
+            rootMargin: '200px',
+            threshold: 0.1
+        };
+
+        const handleIntersect = (entries, observer) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting && !loading) {
+                    const trigger = entry.target;
+                    const page = trigger.getAttribute('data-page');
+                    const hasMore = trigger.getAttribute('data-has-more') === 'true';
+
+                    if (hasMore) {
+                        loadMore(page, trigger, observer);
+                    }
+                }
+            });
+        };
+
+        const observer = new IntersectionObserver(handleIntersect, observerOptions);
+
+        const initObserver = () => {
+            const trigger = document.getElementById('load-more-trigger');
+            if (trigger) {
+                observer.observe(trigger);
+            }
+        };
+
+        initObserver();
+
+        async function loadMore(page, trigger, observer) {
+            loading = true;
+            // Remove old trigger while loading
+            trigger.remove();
+
+            try {
+                const response = await fetch(`/cache?page=${page}&ip=${currentIp}&ajax=true`);
+                if (!response.ok) throw new Error('Network response was not ok');
+
+                const html = await response.text();
+
+                if (page === "1" && html.trim() === "") {
+                    grid.innerHTML = '<div class="empty">No images found in cache.</div>';
+                    return;
+                }
+
+                // Append new content
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = html;
+
+                const fragment = document.createDocumentFragment();
+                while (tempDiv.firstChild) {
+                    fragment.appendChild(tempDiv.firstChild);
+                }
+
+                grid.appendChild(fragment);
+
+                // Observe new trigger if it exists
+                initObserver();
+            } catch (error) {
+                console.error('Error loading more images:', error);
+            } finally {
+                loading = false;
+            }
+        }
+    });
+</script>
 </body>
 
 </html>
