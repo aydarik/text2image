@@ -25,6 +25,9 @@ total_execution_time = 0.0
 playwright_instance = None
 browser_instance = None
 
+# Environment variables
+SAVE_IMAGES = os.getenv("SAVE_IMAGES", "false").lower() == "true"
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global playwright_instance, browser_instance
@@ -120,15 +123,17 @@ async def render_html(request: RenderRequest, req: Request):
 
             screenshot_bytes = await page.screenshot(type="jpeg", quality=90)
             
-            # Save to disk if caching is enabled
-            if cache_enabled:
-                with open(file_path, "wb") as f:
-                    f.write(screenshot_bytes)
-            
             execution_time = (time.time() - start_render) * 1000
             log_msg = f"Generated in {int(execution_time)} ms"
-            if cache_enabled:
+            
+            # Save to disk if caching is enabled or SAVE_IMAGES is set
+            if cache_enabled or SAVE_IMAGES:
+                with open(file_path, "wb") as f:
+                    f.write(screenshot_bytes)
                 log_msg += f": {req_hash}"
+                if not cache_enabled:
+                    log_msg += " (forced save)"
+            
             logger.info(log_msg)
             
             # Update metrics
