@@ -29,22 +29,32 @@ def check_auth(credentials: HTTPBasicCredentials = Depends(security)):
 
 
 @router.get("/cache", response_class=HTMLResponse)
-async def get_cache_manager(request: Request, page: int = 1, auth: bool = Depends(check_auth)):
+async def get_cache_manager(request: Request, page: int = 1, ip: str = None, auth: bool = Depends(check_auth)):
     output_dir = "images"
 
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
+    all_ips = [d for d in os.listdir(output_dir) if os.path.isdir(os.path.join(output_dir, d))]
+
     files = []
-    for f in os.listdir(output_dir):
-        if f.endswith(".jpg"):
-            path = os.path.join(output_dir, f)
-            ctime = os.path.getctime(path)
-            files.append({
-                "name": f,
-                "ctime": ctime,
-                "date": datetime.datetime.fromtimestamp(ctime).strftime("%Y-%m-%d %H:%M:%S")
-            })
+    search_dirs = [os.path.join(output_dir, ip)] if ip and ip != "all" \
+        else [os.path.join(output_dir, d) for d in all_ips]
+
+    for d in search_dirs:
+        if not os.path.exists(d):
+            continue
+        ip_name = os.path.basename(d)
+        for f in os.listdir(d):
+            if f.endswith(".jpg"):
+                path = os.path.join(d, f)
+                ctime = os.path.getctime(path)
+                files.append({
+                    "name": f,
+                    "ip": ip_name,
+                    "ctime": ctime,
+                    "date": datetime.datetime.fromtimestamp(ctime).strftime("%Y-%m-%d %H:%M:%S")
+                })
 
     # Sort by creation date DESC
     files.sort(key=lambda x: x["ctime"], reverse=True)
@@ -62,25 +72,33 @@ async def get_cache_manager(request: Request, page: int = 1, auth: bool = Depend
             "request": request,
             "images": paginated_files,
             "page": page,
-            "has_more": has_more
+            "has_more": has_more,
+            "all_ips": sorted(all_ips),
+            "current_ip": ip or "all"
         }
     )
 
 
 @router.post("/cache/clear")
-async def clear_cache(auth: bool = Depends(check_auth)):
+async def clear_cache(ip: str = "all", auth: bool = Depends(check_auth)):
     output_dir = "images"
 
     if not os.path.exists(output_dir):
         return RedirectResponse(url="/cache", status_code=303)
 
-    for f in os.listdir(output_dir):
-        if f.endswith(".jpg"):
-            path = os.path.join(output_dir, f)
-            try:
-                os.remove(path)
-                logger.info(f"Deleted from cache: {f}")
-            except Exception as e:
-                logger.error(f"Error deleting {f}: {e}")
+    search_dirs = [os.path.join(output_dir, ip)] if ip != "all" \
+        else [os.path.join(output_dir, d) for d in os.listdir(output_dir) if os.path.isdir(os.path.join(output_dir, d))]
 
-    return RedirectResponse(url="/cache", status_code=303)
+    for d in search_dirs:
+        if not os.path.exists(d):
+            continue
+        for f in os.listdir(d):
+            if f.endswith(".jpg"):
+                path = os.path.join(d, f)
+                try:
+                    os.remove(path)
+                    logger.info(f"Deleted from cache: {f} in {d}")
+                except Exception as e:
+                    logger.error(f"Error deleting {f} in {d}: {e}")
+
+    return RedirectResponse(url=f"/cache?ip={ip}", status_code=303)

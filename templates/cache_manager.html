@@ -144,8 +144,19 @@
     <header>
         <h1>Image Cache</h1>
         <div class="controls">
+            <form action="/cache" method="get" style="display: flex; gap: 0.5rem;" id="filter-form">
+                <select name="ip" onchange="document.getElementById('filter-form').submit()">
+                    <option value="all" {% if current_ip=='all' %}selected{% endif %}>All</option>
+                    {% for ip_opt in all_ips %}
+                    <option value="{{ ip_opt }}" {% if current_ip==ip_opt %}selected{% endif %}>{{ ip_opt }}</option>
+                    {% endfor %}
+                </select>
+            </form>
             <form action="/cache/clear" method="post" style="display: flex; gap: 0.5rem;">
-                <button type="submit">Clear Cache</button>
+                <input type="hidden" name="ip" value="{{ current_ip }}">
+                <button type="submit" onclick="return confirm('Clear cache for {{ current_ip }}?')">Clear
+                    Cache
+                </button>
             </form>
         </div>
     </header>
@@ -156,9 +167,10 @@
     <div class="grid">
         {% for img in images %}
         <div class="card">
-            <img src="/images_static/{{ img.name }}" alt="{{ img.name }}" loading="lazy">
+            <img src="/images_static/{{ img.ip }}/{{ img.name }}" alt="{{ img.name }}" loading="lazy">
             <div class="card-info">
-                <div>{{ img.name[:16] }}...</div>
+                <div style="color: var(--accent); margin-bottom: 4px;">{{ img.ip }}</div>
+                <div>{{ img.name[:20] }}...</div>
                 <div style="margin-top: 4px;">{{ img.date }}</div>
             </div>
         </div>
@@ -168,10 +180,10 @@
 
     <div class="pagination">
         {% if page > 1 %}
-        <a href="/cache?page={{ page - 1 }}">Previous</a>
+        <a href="/cache?page={{ page - 1 }}&ip={{ current_ip }}">Previous</a>
         {% endif %}
         {% if has_more %}
-        <a href="/cache?page={{ page + 1 }}">Next</a>
+        <a href="/cache?page={{ page + 1 }}&ip={{ current_ip }}">Next</a>
         {% endif %}
     </div>
 </div>

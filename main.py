@@ -47,7 +47,7 @@ app = FastAPI(
 )
 
 # Mount images directory for static access
-app.mount("/images_static", StaticFiles(directory="images"), name="images_static")
+app.mount("/images_static", StaticFiles(directory="images", html=True), name="images_static")
 
 # Include cache management router
 app.include_router(cache_manager.router)
@@ -89,7 +89,8 @@ async def render_html(request: RenderRequest, req: Request):
         req_str = json.dumps(req_dict, sort_keys=True)
         req_hash = hashlib.sha256(req_str.encode("utf-8")).hexdigest()
         
-        output_dir = "images"
+        # Define output directory based on IP
+        output_dir = os.path.join("images", request_ip)
         os.makedirs(output_dir, exist_ok=True)
         
         # Check if caching is enabled (enabled by default)
