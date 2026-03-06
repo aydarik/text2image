@@ -71,7 +71,7 @@ async def get_cache_manager(request: Request, page: int = 1, ip: str = None, aja
     files.sort(key=lambda x: x["ctime"], reverse=True)
 
     # Pagination
-    PAGE_SIZE = 120
+    PAGE_SIZE = 60
     start = (page - 1) * PAGE_SIZE
     end = start + PAGE_SIZE
     paginated_files = files[start:end]
@@ -107,7 +107,6 @@ async def clear_cache(ip: str = "all", auth: bool = Depends(check_auth)):
                 path = os.path.join(d, f)
                 try:
                     os.remove(path)
-                    logger.info(f"Deleted from cache: {f} in {d}")
                 except Exception as e:
                     logger.error(f"Error deleting {f} in {d}: {e}")
 
