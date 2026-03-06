@@ -38,13 +38,23 @@ async def get_cache_manager(request: Request, page: int = 1, ip: str = None, aja
 
     all_ips = [d for d in os.listdir(output_dir) if os.path.isdir(os.path.join(output_dir, d))]
 
+    # Calculate total count for the manager page
+    total_count = 0
+    if not ajax:
+        search_dirs = [os.path.join(output_dir, ip)] if ip and ip != "all" \
+            else [os.path.join(output_dir, d) for d in all_ips]
+        for d in search_dirs:
+            if os.path.exists(d):
+                total_count += len([f for f in os.listdir(d) if f.endswith(".jpg")])
+
     if not ajax:
         return templates.TemplateResponse(
             "cache_manager.html",
             {
                 "request": request,
                 "all_ips": sorted(all_ips),
-                "current_ip": ip or "all"
+                "current_ip": ip or "all",
+                "total_count": total_count
             }
         )
 

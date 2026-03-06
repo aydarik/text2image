@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.3.3] - 2026-03-06
+
+### Changed
+- Cache management UI improvements.
+
 ## [1.3.2] - 2026-03-06
 
 ### Changed
