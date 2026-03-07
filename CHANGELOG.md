@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.3.4] - 2026-03-07
+
+### Fixed
+- Clear cache by IP.
+
 ## [1.3.3] - 2026-03-06
 
 ### Changed
