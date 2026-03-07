@@ -29,8 +29,9 @@ def check_auth(credentials: HTTPBasicCredentials = Depends(security)):
 
 
 @router.get("/cache", response_class=HTMLResponse)
-async def get_cache_manager(request: Request, page: int = 1, ip: str = None, ajax: bool = False,
+async def get_cache_manager(request: Request, page: int = 1, ip: str = "all", ajax: bool = False,
                             auth: bool = Depends(check_auth)):
+    ip = os.path.basename(ip)
     output_dir = "images"
 
     if not os.path.exists(output_dir):
@@ -100,7 +101,8 @@ async def get_cache_manager(request: Request, page: int = 1, ip: str = None, aja
 
 
 @router.post("/cache/clear")
-async def clear_cache(ip: str = "all", auth: bool = Depends(check_auth)):
+async def clear_cache(ip: str = Form("all"), auth: bool = Depends(check_auth)):
+    ip = os.path.basename(ip)
     output_dir = "images"
 
     if not os.path.exists(output_dir):
@@ -110,13 +112,12 @@ async def clear_cache(ip: str = "all", auth: bool = Depends(check_auth)):
         else [os.path.join(output_dir, d) for d in os.listdir(output_dir) if os.path.isdir(os.path.join(output_dir, d))]
 
     for d in search_dirs:
-        if not os.path.exists(d):
+        if not os.path.isdir(d):
             continue
         for f in os.listdir(d):
             if f.endswith(".jpg"):
-                path = os.path.join(d, f)
                 try:
-                    os.remove(path)
+                    os.remove(os.path.join(d, f))
                 except Exception as e:
                     logger.error(f"Error deleting {f} in {d}: {e}")
 
