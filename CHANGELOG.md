@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.3.5] - 2026-04-30
+
+### Added
+- Rate-limiting/Blacklisting by IP.
+- Save failed requests.
+
+### Fixed
+- Restart browser automatically on disconnect.
+
 ## [1.3.4] - 2026-03-07
 
 ### Fixed
