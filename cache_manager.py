@@ -49,9 +49,9 @@ async def get_cache_manager(request: Request, page: int = 1, ip: str = "all", aj
 
     if not ajax:
         return templates.TemplateResponse(
-            "cache_manager.html",
-            {
-                "request": request,
+            request=request,
+            name="cache_manager.html",
+            context={
                 "all_ips": sorted(all_ips),
                 "current_ip": ip or "all",
                 "total_count": total_count
@@ -88,9 +88,9 @@ async def get_cache_manager(request: Request, page: int = 1, ip: str = "all", aj
     has_more = len(files) > end
 
     return templates.TemplateResponse(
-        "cache_manager_grid.html",
-        {
-            "request": request,
+        request=request,
+        name="cache_manager_grid.html",
+        context={
             "images": paginated_files,
             "page": page,
             "has_more": has_more,

@@ -129,7 +129,6 @@ async def render_html(request: RenderRequest, req: Request):
     
     current_time = time.time()
     if request_ip in last_request_time and current_time - last_request_time[request_ip] < RATE_LIMIT_SECONDS:
-        logger.info(f"Request rejected (Too Many Requests) for IP: {request_ip}")
         raise HTTPException(
             status_code=429,
             detail=f"Too Many Requests. Only 1 request per {RATE_LIMIT_SECONDS} seconds is allowed."
@@ -141,7 +140,6 @@ async def render_html(request: RenderRequest, req: Request):
         # FastAPI handles the parsing and validation of the request body into 'request'
         
         ip_count = render_count.get(request_ip, 0) + 1
-        logger.info(f"Request {int(ip_count)} from IP: {request_ip}")
 
         # Calculate hash of the request
         req_dict = request.dict()
@@ -161,7 +159,6 @@ async def render_html(request: RenderRequest, req: Request):
         
         # Check if file exists in cache
         if cache_enabled and os.path.exists(file_path):
-            logger.info(f"Cache hit: {req_hash}")
             with open(file_path, "rb") as f:
                 cached_bytes = f.read()
             return Response(content=cached_bytes, media_type="image/jpeg")
@@ -189,17 +186,15 @@ async def render_html(request: RenderRequest, req: Request):
                     screenshot_bytes = await page.screenshot(type="jpeg", quality=90)
                     
                     execution_time = (time.time() - start_render) * 1000
-                    log_msg = f"Generated in {int(execution_time)} ms"
                     
                     # Save to disk if caching is enabled or SAVE_IMAGES is set
                     if cache_enabled or SAVE_IMAGES:
                         with open(file_path, "wb") as f:
                             f.write(screenshot_bytes)
-                        log_msg += f": {req_hash}"
                         if not cache_enabled:
                             log_msg += " (forced save)"
                     
-                    logger.info(log_msg)
+                    logger.info(f"Generated in {int(execution_time)} ms")
                     
                     # Update metrics
                     render_count[request_ip] = ip_count
@@ -244,7 +239,6 @@ async def get_status():
         "render_count": total_renders,
         "render_avg": int(total_execution_time / total_renders) if total_renders > 0 else 0
     }
-    logger.info(f"Service status: {status}")
     return status
 
 if __name__ == "__main__":
