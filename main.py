@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 START_TIME = time.time()
 render_count = {}  # Maps IP address to count
+last_request_time = {}  # Maps IP address to last request time
 total_execution_time = 0.0
 
 # Global playwright and browser objects
@@ -27,6 +28,7 @@ browser_instance = None
 
 # Environment variables
 SAVE_IMAGES = os.getenv("SAVE_IMAGES", "false").lower() == "true"
+RATE_LIMIT_SECONDS = int(os.getenv("RATE_LIMIT_SECONDS", "55"))
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -70,16 +72,26 @@ class RenderRequest(BaseModel):
     }
 )
 async def render_html(request: RenderRequest, req: Request):
-    global render_count, total_execution_time
+    global render_count, total_execution_time, last_request_time
+    
+    request_ip = (
+        req.headers.get("cf-connecting-ip")
+        or req.headers.get("x-forwarded-for", "").split(",")[0]
+        or req.client.host
+    )
+    
+    current_time = time.time()
+    if request_ip in last_request_time and current_time - last_request_time[request_ip] < RATE_LIMIT_SECONDS:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Too Many Requests. Only 1 request per {RATE_LIMIT_SECONDS} seconds is allowed."
+        )
+    last_request_time[request_ip] = current_time
+
     start_render = time.time()
     try:
         # FastAPI handles the parsing and validation of the request body into 'request'
         
-        request_ip = (
-            req.headers.get("cf-connecting-ip")
-            or req.headers.get("x-forwarded-for", "").split(",")[0]
-            or req.client.host
-        )
         ip_count = render_count.get(request_ip, 0) + 1
         logger.info(f"Request {int(ip_count)} from IP: {request_ip}")
 
