@@ -93,7 +93,6 @@ async def ip_check_middleware(request: Request, call_next):
     request.state.ip = request_ip
     
     if request_ip in IP_BLACKLIST:
-        logger.warning(f"Blacklisted IP attempt: {request_ip}")
         return Response(content="Forbidden", status_code=403)
     
     response = await call_next(request)
