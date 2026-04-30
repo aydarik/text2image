@@ -4,7 +4,6 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
 import os
 import datetime
-import time
 import logging
 
 logger = logging.getLogger(__name__)

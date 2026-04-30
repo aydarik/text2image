@@ -116,6 +116,7 @@ async def render_html(request: RenderRequest, req: Request):
     
     current_time = time.time()
     if request_ip in last_request_time and current_time - last_request_time[request_ip] < RATE_LIMIT_SECONDS:
+        logger.info(f"Request rejected (Too Many Requests) for IP: {request_ip}")
         raise HTTPException(
             status_code=429,
             detail=f"Too Many Requests. Only 1 request per {RATE_LIMIT_SECONDS} seconds is allowed."
@@ -205,8 +206,17 @@ async def render_html(request: RenderRequest, req: Request):
                 else:
                     raise e
     except Exception as e:
-        logger.error(f"Error rendering HTML: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        error_msg = str(e)
+        logger.error(f"Error rendering HTML: {error_msg}")
+        html_file_path = os.path.join(output_dir, f"{req_hash}.html")
+        if not os.path.exists(html_file_path):
+            try:
+                with open(html_file_path, "w", encoding="utf-8") as f:
+                    f.write(request.html)
+                logger.info(f"Saved failed HTML to {html_file_path}")
+            except Exception as save_error:
+                logger.error(f"Failed to save failed HTML: {save_error}")
+        raise HTTPException(status_code=500, detail=error_msg)
 
 @app.get(
     "/status",
