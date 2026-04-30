@@ -67,7 +67,8 @@ async def stop_browser():
 
 # Environment variables
 SAVE_IMAGES = os.getenv("SAVE_IMAGES", "false").lower() == "true"
-RATE_LIMIT_SECONDS = int(os.getenv("RATE_LIMIT_SECONDS", "55"))
+RATE_LIMIT_SECONDS = int(os.getenv("RATE_LIMIT_SECONDS", "20"))
+IP_BLACKLIST = set(filter(None, [ip.strip() for ip in os.getenv("IP_BLACKLIST", "").split(",")]))
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -81,6 +82,22 @@ app = FastAPI(
     version="1.3.4",
     lifespan=lifespan
 )
+
+@app.middleware("http")
+async def ip_check_middleware(request: Request, call_next):
+    request_ip = (
+        request.headers.get("cf-connecting-ip")
+        or request.headers.get("x-forwarded-for", "").split(",")[0]
+        or request.client.host
+    )
+    request.state.ip = request_ip
+    
+    if request_ip in IP_BLACKLIST:
+        logger.warning(f"Blacklisted IP attempt: {request_ip}")
+        return Response(content="Forbidden", status_code=403)
+    
+    response = await call_next(request)
+    return response
 
 # Mount images directory for static access
 app.mount("/images_static", StaticFiles(directory="images", html=True), name="images_static")
@@ -108,11 +125,7 @@ class RenderRequest(BaseModel):
 async def render_html(request: RenderRequest, req: Request):
     global render_count, total_execution_time, last_request_time
     
-    request_ip = (
-        req.headers.get("cf-connecting-ip")
-        or req.headers.get("x-forwarded-for", "").split(",")[0]
-        or req.client.host
-    )
+    request_ip = req.state.ip
     
     current_time = time.time()
     if request_ip in last_request_time and current_time - last_request_time[request_ip] < RATE_LIMIT_SECONDS:
