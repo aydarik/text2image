@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from playwright.async_api import async_playwright
 import uvicorn
 import time
+import random
 import logging
 import hashlib
 import json
@@ -79,7 +80,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="HTML to JPG API",
     description="An API to render HTML content as a JPG image using Playwright.",
-    version="1.3.5",
+    version="1.3.6",
     lifespan=lifespan
 )
 
@@ -94,6 +95,13 @@ async def ip_check_middleware(request: Request, call_next):
     
     if request_ip in IP_BLACKLIST:
         return Response(content="Forbidden", status_code=403)
+    
+    # Add jitter for requests coming in the first 5 seconds of every minute (only for /render)
+    current_time = time.time()
+    if request.url.path == "/render" and current_time % 60 < 5:
+        jitter = random.uniform(0, 5)
+        # logger.info(f"Applying {jitter:.2f}s jitter for request to {request.url.path} from {request_ip}")
+        await asyncio.sleep(jitter)
     
     response = await call_next(request)
     return response
@@ -193,7 +201,7 @@ async def render_html(request: RenderRequest, req: Request):
                         if not cache_enabled:
                             log_msg += " (forced save)"
                     
-                    logger.info(f"Generated in {int(execution_time)} ms")
+                    # logger.info(f"Generated in {int(execution_time)} ms")
                     
                     # Update metrics
                     render_count[request_ip] = ip_count

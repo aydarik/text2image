@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.3.6] - 2026-07-05
+
+### Added
+- Jitter to /render endpoint to randomize requests.
+
 ## [1.3.5] - 2026-04-30
 
 ### Added
