@@ -156,8 +156,7 @@ async def render_html(request: RenderRequest, req: Request):
         
         # Define output directory based on IP
         output_dir = os.path.join("images", request_ip)
-        os.makedirs(output_dir, exist_ok=True)
-        
+
         # Check if caching is enabled (enabled by default)
         cache_enabled = request.cache
         
@@ -196,6 +195,7 @@ async def render_html(request: RenderRequest, req: Request):
                     
                     # Save to disk if caching is enabled or SAVE_IMAGES is set
                     if cache_enabled or SAVE_IMAGES:
+                        os.makedirs(output_dir, exist_ok=True)
                         with open(file_path, "wb") as f:
                             f.write(screenshot_bytes)
                         if not cache_enabled:

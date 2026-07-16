@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.3.7] - 2026-07-16
+
+### Fixes
+- Create directory for cache only when requested.
+
 ## [1.3.6] - 2026-07-05
 
 ### Added
