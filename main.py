@@ -80,7 +80,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="HTML to JPG API",
     description="An API to render HTML content as a JPG image using Playwright.",
-    version="1.3.6",
+    version="1.3.8",
     lifespan=lifespan
 )
 
@@ -144,8 +144,6 @@ async def render_html(request: RenderRequest, req: Request):
 
     start_render = time.time()
     try:
-        # FastAPI handles the parsing and validation of the request body into 'request'
-        
         ip_count = render_count.get(request_ip, 0) + 1
 
         # Calculate hash of the request
