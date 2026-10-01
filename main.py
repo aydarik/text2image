@@ -70,7 +70,7 @@ async def stop_browser():
 
 # Environment variables
 SAVE_IMAGES = os.getenv("SAVE_IMAGES", "false").lower() == "true"
-RATE_LIMIT_SECONDS = int(os.getenv("RATE_LIMIT_SECONDS", "20"))
+RATE_LIMIT_SECONDS = int(os.getenv("RATE_LIMIT_SECONDS", "0"))
 IP_BLACKLIST = set(filter(None, [ip.strip() for ip in os.getenv("IP_BLACKLIST", "").split(",")]))
 
 # Locks for shared mutable state
@@ -141,15 +141,16 @@ async def render_html(request: RenderRequest, req: Request):
     request_ip = req.state.ip
 
     # Rate limiting with a lock to prevent race conditions on concurrent requests from the same IP
-    async with rate_limit_lock:
-        current_time = time.time()
-        last_time = last_request_time.get(request_ip)
-        if last_time is not None and current_time - last_time < RATE_LIMIT_SECONDS:
-            raise HTTPException(
-                status_code=429,
-                detail=f"Too Many Requests. Only 1 request per {RATE_LIMIT_SECONDS} seconds is allowed."
-            )
-        last_request_time[request_ip] = current_time
+    if RATE_LIMIT_SECONDS > 0:
+        async with rate_limit_lock:
+            current_time = time.time()
+            last_time = last_request_time.get(request_ip)
+            if last_time is not None and current_time - last_time < RATE_LIMIT_SECONDS:
+                raise HTTPException(
+                    status_code=429,
+                    detail=f"Too Many Requests. Only 1 request per {RATE_LIMIT_SECONDS} seconds is allowed."
+                )
+            last_request_time[request_ip] = current_time
 
     # Calculate hash of the request for caching
     req_dict = request.model_dump()
