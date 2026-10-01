@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.3.12] - 2026-10-01
+
+### Added
+ - Cached image response code.
+ - Rate-limit disable option.
+
 ## [1.3.11] - 2026-10-01
 
 ### Changed

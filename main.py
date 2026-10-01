@@ -86,7 +86,7 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(
     title="HTML to JPG API",
     description="An API to render HTML content as a JPG image using Playwright.",
-    version="1.3.11",
+    version="1.3.12",
     lifespan=lifespan
 )
 
@@ -129,9 +129,22 @@ class RenderRequest(BaseModel):
     summary="Render HTML to JPG",
     description="Accepts an HTML string and dimensions, renders it in a headless browser, and returns the screenshot as a JPEG image.",
     responses={
-        200: {
+        201: {
             "content": {"image/jpeg": {}},
-            "description": "The rendered JPG image."
+            "description": "Rendered JPG image."
+        },
+        203: {
+            "content": {"image/jpeg": {}},
+            "description": "Cached JPG image."
+        },
+        403: {
+            "description": "Forbidden."
+        },
+        429: {
+            "description": "Too Many Requests."
+        },
+        500: {
+            "description": "Internal Server Error."
         }
     }
 )
@@ -169,7 +182,7 @@ async def render_html(request: RenderRequest, req: Request):
         with open(file_path, "rb") as f:
             cached_bytes = f.read()
         logger.info(f"Returning cached image to {request_ip}: {req_hash}")
-        return Response(content=cached_bytes, media_type="image/jpeg")
+        return Response(content=cached_bytes, media_type="image/jpeg", status_code=203)
 
     start_render = time.time()
 
@@ -211,7 +224,7 @@ async def render_html(request: RenderRequest, req: Request):
                         total_execution_time += execution_time
                         logger.info(f"Image {render_count_val} generated in {execution_time:.2f}ms (cache: {cache_enabled}) for {request_ip}: {req_hash}")
 
-                    return Response(content=screenshot_bytes, media_type="image/jpeg")
+                    return Response(content=screenshot_bytes, media_type="image/jpeg", status_code=201)
                 finally:
                     # Always close the page and context to free resources
                     await context.close()
