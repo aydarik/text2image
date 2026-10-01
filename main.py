@@ -60,16 +60,22 @@ async def stop_browser():
             await browser_instance.close()
         except Exception:
             pass
+        browser_instance = None
     if playwright_instance:
         try:
             await playwright_instance.stop()
         except Exception:
             pass
+        playwright_instance = None
 
 # Environment variables
 SAVE_IMAGES = os.getenv("SAVE_IMAGES", "false").lower() == "true"
 RATE_LIMIT_SECONDS = int(os.getenv("RATE_LIMIT_SECONDS", "20"))
 IP_BLACKLIST = set(filter(None, [ip.strip() for ip in os.getenv("IP_BLACKLIST", "").split(",")]))
+
+# Locks for shared mutable state
+rate_limit_lock = asyncio.Lock()
+metrics_lock = asyncio.Lock()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -80,7 +86,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="HTML to JPG API",
     description="An API to render HTML content as a JPG image using Playwright.",
-    version="1.3.8",
+    version="1.3.9",
     lifespan=lifespan
 )
 
@@ -88,7 +94,7 @@ app = FastAPI(
 async def ip_check_middleware(request: Request, call_next):
     request_ip = (
         request.headers.get("cf-connecting-ip")
-        or request.headers.get("x-forwarded-for", "").split(",")[0]
+        or request.headers.get("x-forwarded-for", "").split(",")[0].strip()
         or request.client.host
     )
     request.state.ip = request_ip
@@ -133,40 +139,39 @@ async def render_html(request: RenderRequest, req: Request):
     global render_count, total_execution_time, last_request_time
     
     request_ip = req.state.ip
-    
-    current_time = time.time()
-    if request_ip in last_request_time and current_time - last_request_time[request_ip] < RATE_LIMIT_SECONDS:
-        raise HTTPException(
-            status_code=429,
-            detail=f"Too Many Requests. Only 1 request per {RATE_LIMIT_SECONDS} seconds is allowed."
-        )
-    last_request_time[request_ip] = current_time
+
+    # Rate limiting with a lock to prevent race conditions on concurrent requests from the same IP
+    async with rate_limit_lock:
+        current_time = time.time()
+        last_time = last_request_time.get(request_ip)
+        if last_time is not None and current_time - last_time < RATE_LIMIT_SECONDS:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Too Many Requests. Only 1 request per {RATE_LIMIT_SECONDS} seconds is allowed."
+            )
+        last_request_time[request_ip] = current_time
+
+    # Calculate hash of the request for caching
+    req_dict = request.model_dump()
+    req_str = json.dumps(req_dict, sort_keys=True)
+    req_hash = hashlib.sha256(req_str.encode("utf-8")).hexdigest()
+
+    # Define output directory based on IP
+    output_dir = os.path.join("images", request_ip)
+    filename = f"{req_hash}.jpg"
+    file_path = os.path.join(output_dir, filename)
+
+    cache_enabled = request.cache
+
+    # Check if file exists in cache
+    if cache_enabled and os.path.exists(file_path):
+        with open(file_path, "rb") as f:
+            cached_bytes = f.read()
+        return Response(content=cached_bytes, media_type="image/jpeg")
 
     start_render = time.time()
+
     try:
-        ip_count = render_count.get(request_ip, 0) + 1
-
-        # Calculate hash of the request
-        req_dict = request.dict()
-        # Sort keys to ensure consistent order for hashing
-        req_str = json.dumps(req_dict, sort_keys=True)
-        req_hash = hashlib.sha256(req_str.encode("utf-8")).hexdigest()
-        
-        # Define output directory based on IP
-        output_dir = os.path.join("images", request_ip)
-
-        # Check if caching is enabled (enabled by default)
-        cache_enabled = request.cache
-        
-        filename = f"{req_hash}.jpg"
-        file_path = os.path.join(output_dir, filename)
-        
-        # Check if file exists in cache
-        if cache_enabled and os.path.exists(file_path):
-            with open(file_path, "rb") as f:
-                cached_bytes = f.read()
-            return Response(content=cached_bytes, media_type="image/jpeg")
-
         # Retry loop for browser errors
         for attempt in range(2):
             try:
@@ -190,20 +195,19 @@ async def render_html(request: RenderRequest, req: Request):
                     screenshot_bytes = await page.screenshot(type="jpeg", quality=90)
                     
                     execution_time = (time.time() - start_render) * 1000
-                    
+
                     # Save to disk if caching is enabled or SAVE_IMAGES is set
                     if cache_enabled or SAVE_IMAGES:
                         os.makedirs(output_dir, exist_ok=True)
                         with open(file_path, "wb") as f:
                             f.write(screenshot_bytes)
                         if not cache_enabled:
-                            log_msg += " (forced save)"
-                    
-                    # logger.info(f"Generated in {int(execution_time)} ms")
-                    
-                    # Update metrics
-                    render_count[request_ip] = ip_count
-                    total_execution_time += execution_time
+                            logger.debug(f"Saved image (forced, SAVE_IMAGES=true): {file_path}")
+
+                    # Update metrics atomically
+                    async with metrics_lock:
+                        render_count[request_ip] = render_count.get(request_ip, 0) + 1
+                        total_execution_time += execution_time
 
                     return Response(content=screenshot_bytes, media_type="image/jpeg")
                 finally:
@@ -211,16 +215,22 @@ async def render_html(request: RenderRequest, req: Request):
                     await context.close()
             except Exception as e:
                 error_msg = str(e)
-                if ("Target page, context or browser has been closed" in error_msg or 
-                    "Browser closed" in error_msg) and attempt == 0:
-                    logger.warning(f"Browser error detected: {error_msg}. Restarting browser and retrying (attempt {attempt + 1})...")
+                is_browser_crash = (
+                    "Target page, context or browser has been closed" in error_msg
+                    or "Browser closed" in error_msg
+                )
+                if is_browser_crash and attempt == 0:
+                    logger.warning(f"Browser crash detected: {error_msg}. Restarting and retrying...")
                     await start_browser()
                     continue
-                else:
-                    raise e
+                raise
+    except HTTPException:
+        raise
     except Exception as e:
         error_msg = str(e)
         logger.error(f"Error rendering HTML: {error_msg}")
+        # Save the failing HTML for post-mortem debugging
+        os.makedirs(output_dir, exist_ok=True)
         html_file_path = os.path.join(output_dir, f"{req_hash}.html")
         if not os.path.exists(html_file_path):
             try:

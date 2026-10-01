@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.3.9] - 2026-10-01
+
+### Changed
+- Bump Playwright version.
+
 ## [1.3.8] - 2026-08-13
 
 ### Changed

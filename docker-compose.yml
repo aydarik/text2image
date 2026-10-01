@@ -4,5 +4,5 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./images:/images
+      - ./images:/app/images
     restart: unless-stopped

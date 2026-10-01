@@ -5,7 +5,7 @@
         <div style="margin-bottom: 4px;">
             <a href="/cache?ip={{ img.ip }}" class="ip-link">{{ img.ip }}</a>
         </div>
-        <div>{{ img.name[:20] }}...</div>
+        <div>{{ img.name[:20] }}{% if img.name|length > 20 %}…{% endif %}</div>
         <div style="margin-top: 4px;">{{ img.date }}</div>
     </div>
 </div>

@@ -1,10 +1,14 @@
-FROM mcr.microsoft.com/playwright/python:v1.62.0-noble
+FROM mcr.microsoft.com/playwright/python:v1.63.0-resolute
 
 WORKDIR /app
 
 COPY requirements.txt .
 
-RUN apt-get update && apt-get install -y fonts-roboto; rm -rf /var/lib/apt/lists/*
+# syntax=docker/dockerfile:1
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && \
+    apt-get install -y --no-install-recommends fonts-roboto
 
 RUN pip install --no-cache-dir -r requirements.txt
 RUN playwright install chromium

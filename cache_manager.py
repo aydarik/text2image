@@ -5,6 +5,7 @@ from fastapi.templating import Jinja2Templates
 import os
 import datetime
 import logging
+import secrets
 
 logger = logging.getLogger(__name__)
 
@@ -12,13 +13,15 @@ router = APIRouter()
 security = HTTPBasic()
 templates = Jinja2Templates(directory="templates")
 
+PAGE_SIZE = 60
+
 
 def check_auth(credentials: HTTPBasicCredentials = Depends(security)):
     correct_password = os.getenv("CACHE_PASSWORD")
     if not correct_password:
         return True
 
-    if credentials.password != correct_password:
+    if not secrets.compare_digest(credentials.password, correct_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect password",
@@ -32,9 +35,7 @@ async def get_cache_manager(request: Request, page: int = 1, ip: str = "all", aj
                             auth: bool = Depends(check_auth)):
     ip = os.path.basename(ip)
     output_dir = "images"
-
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    os.makedirs(output_dir, exist_ok=True)
 
     all_ips = [d for d in os.listdir(output_dir) if os.path.isdir(os.path.join(output_dir, d))]
 
@@ -69,7 +70,7 @@ async def get_cache_manager(request: Request, page: int = 1, ip: str = "all", aj
         for f in os.listdir(d):
             if f.endswith(".jpg"):
                 path = os.path.join(d, f)
-                ctime = os.path.getctime(path)
+                ctime = os.path.getmtime(path)
                 files.append({
                     "name": f,
                     "ip": ip_name,
@@ -81,7 +82,6 @@ async def get_cache_manager(request: Request, page: int = 1, ip: str = "all", aj
     files.sort(key=lambda x: x["ctime"], reverse=True)
 
     # Pagination
-    PAGE_SIZE = 60
     start = (page - 1) * PAGE_SIZE
     end = start + PAGE_SIZE
     paginated_files = files[start:end]
