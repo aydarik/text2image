@@ -86,7 +86,7 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(
     title="HTML to JPG API",
     description="An API to render HTML content as a JPG image using Playwright.",
-    version="1.3.12",
+    version="1.3.13",
     lifespan=lifespan
 )
 
@@ -113,6 +113,7 @@ async def ip_check_middleware(request: Request, call_next):
     return response
 
 # Mount images directory for static access
+os.makedirs("images", exist_ok=True)
 app.mount("/images_static", StaticFiles(directory="images", html=True), name="images_static")
 
 # Include cache management router

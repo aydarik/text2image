@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.3.13] - 2026-10-01
+
+### Fixes
+ - Prevent crash when the images directory is not mounted.
+
 ## [1.3.12] - 2026-10-01
 
 ### Added
