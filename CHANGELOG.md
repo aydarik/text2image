@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.3.11] - 2026-10-01
+
+### Changed
+ - Caching improvement.
+
 ## [1.3.10] - 2026-10-01
 
 ### Changed

@@ -86,7 +86,7 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(
     title="HTML to JPG API",
     description="An API to render HTML content as a JPG image using Playwright.",
-    version="1.3.10",
+    version="1.3.11",
     lifespan=lifespan
 )
 
@@ -164,7 +164,7 @@ async def render_html(request: RenderRequest, req: Request):
     cache_enabled = request.cache
 
     # Check if file exists in cache
-    if cache_enabled and os.path.exists(file_path):
+    if (cache_enabled or SAVE_IMAGES) and os.path.exists(file_path):
         with open(file_path, "rb") as f:
             cached_bytes = f.read()
         logger.info(f"Returning cached image to {request_ip}: {req_hash}")
