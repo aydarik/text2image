@@ -78,7 +78,7 @@ rate_limit_lock = asyncio.Lock()
 metrics_lock = asyncio.Lock()
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_app: FastAPI):
     await start_browser()
     yield
     await stop_browser()
@@ -86,7 +86,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="HTML to JPG API",
     description="An API to render HTML content as a JPG image using Playwright.",
-    version="1.3.9",
+    version="1.3.10",
     lifespan=lifespan
 )
 
@@ -106,7 +106,7 @@ async def ip_check_middleware(request: Request, call_next):
     current_time = time.time()
     if request.url.path == "/render" and current_time % 60 < 5:
         jitter = random.uniform(0, 5)
-        # logger.info(f"Applying {jitter:.2f}s jitter for request to {request.url.path} from {request_ip}")
+        logger.info(f"Applying {jitter:.2f}s jitter for request from {request_ip}")
         await asyncio.sleep(jitter)
     
     response = await call_next(request)
@@ -167,6 +167,7 @@ async def render_html(request: RenderRequest, req: Request):
     if cache_enabled and os.path.exists(file_path):
         with open(file_path, "rb") as f:
             cached_bytes = f.read()
+        logger.info(f"Returning cached image to {request_ip}: {req_hash}")
         return Response(content=cached_bytes, media_type="image/jpeg")
 
     start_render = time.time()
@@ -201,13 +202,13 @@ async def render_html(request: RenderRequest, req: Request):
                         os.makedirs(output_dir, exist_ok=True)
                         with open(file_path, "wb") as f:
                             f.write(screenshot_bytes)
-                        if not cache_enabled:
-                            logger.debug(f"Saved image (forced, SAVE_IMAGES=true): {file_path}")
 
                     # Update metrics atomically
                     async with metrics_lock:
-                        render_count[request_ip] = render_count.get(request_ip, 0) + 1
+                        render_count_val = render_count.get(request_ip, 0) + 1
+                        render_count[request_ip] = render_count_val
                         total_execution_time += execution_time
+                        logger.info(f"Image {render_count_val} generated in {execution_time:.2f}ms (cache: {cache_enabled}) for {request_ip}: {req_hash}")
 
                     return Response(content=screenshot_bytes, media_type="image/jpeg")
                 finally:
@@ -224,11 +225,13 @@ async def render_html(request: RenderRequest, req: Request):
                     await start_browser()
                     continue
                 raise
-    except HTTPException:
+    except HTTPException as e:
+        error_msg = str(e)
+        logger.error(f"HTTP exception for {request_ip}: {error_msg}")
         raise
     except Exception as e:
         error_msg = str(e)
-        logger.error(f"Error rendering HTML: {error_msg}")
+        logger.error(f"Error rendering for {request_ip}: {error_msg}")
         # Save the failing HTML for post-mortem debugging
         os.makedirs(output_dir, exist_ok=True)
         html_file_path = os.path.join(output_dir, f"{req_hash}.html")
@@ -236,7 +239,7 @@ async def render_html(request: RenderRequest, req: Request):
             try:
                 with open(html_file_path, "w", encoding="utf-8") as f:
                     f.write(request.html)
-                logger.info(f"Saved failed HTML to {html_file_path}")
+                logger.info(f"Saved failed HTML: {html_file_path}")
             except Exception as save_error:
                 logger.error(f"Failed to save failed HTML: {save_error}")
         raise HTTPException(status_code=500, detail=error_msg)

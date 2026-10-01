@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.3.10] - 2026-10-01
+
+### Changed
+- Improved logging.
+
 ## [1.3.9] - 2026-10-01
 
 ### Changed
