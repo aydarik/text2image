@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 import re
+import math
 
 from contextlib import asynccontextmanager
 import asyncio
@@ -22,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 START_TIME = time.time()
 render_count = {}  # Maps IP address to count
-last_request_time = {}  # Maps IP address to last request time
+rate_buckets = {}  # Maps IP address to [tokens, last_refill_monotonic]
 total_execution_time = 0.0
 
 # Global playwright and browser objects
@@ -51,7 +52,7 @@ async def start_browser():
                 pass
 
         playwright_instance = await async_playwright().start()
-        browser_instance = await playwright_instance.chromium.launch()
+        browser_instance = await playwright_instance.chromium.launch(args=CHROMIUM_ARGS)
 
 async def stop_browser():
     global playwright_instance, browser_instance
@@ -71,11 +72,20 @@ async def stop_browser():
 
 # Environment variables
 SAVE_IMAGES = os.getenv("SAVE_IMAGES", "false").lower() == "true"
-RATE_LIMIT_SECONDS = int(os.getenv("RATE_LIMIT_SECONDS", "0"))
+# Token bucket per IP: one token is refilled every RATE_LIMIT_SECONDS, up to RATE_LIMIT_BURST tokens.
+RATE_LIMIT_SECONDS = float(os.getenv("RATE_LIMIT_SECONDS", "0"))
+RATE_LIMIT_BURST = max(1, int(os.getenv("RATE_LIMIT_BURST", "1")))
+# Jitter spreads out bursts of renders that arrive at the start of each minute (e.g. cron-driven clients).
+JITTER_WINDOW_SECONDS = float(os.getenv("JITTER_WINDOW_SECONDS", "5"))
+JITTER_MAX_SECONDS = float(os.getenv("JITTER_MAX_SECONDS", "5"))
+BUCKET_PRUNE_THRESHOLD = 1000
 IP_BLACKLIST = set(filter(None, [ip.strip() for ip in os.getenv("IP_BLACKLIST", "").split(",")]))
 
+# Extra Chromium flags. /dev/shm is only 64MB in Docker by default, which makes Chromium crash on heavy pages.
+# Playwright already disables the sandbox and GPU in headless mode, so those flags are not repeated here.
+CHROMIUM_ARGS = ["--disable-dev-shm-usage"] + os.getenv("CHROMIUM_EXTRA_ARGS", "").split()
+
 # Locks for shared mutable state
-rate_limit_lock = asyncio.Lock()
 metrics_lock = asyncio.Lock()
 
 @asynccontextmanager
@@ -109,13 +119,6 @@ async def ip_check_middleware(request: Request, call_next):
     if request_ip in IP_BLACKLIST:
         return Response(content="Forbidden", status_code=403)
     
-    # Add jitter for requests coming in the first 5 seconds of every minute (only for /render)
-    current_time = time.time()
-    if request.url.path == "/render" and current_time % 60 < 5:
-        jitter = random.uniform(0, 5)
-        logger.info(f"Applying {jitter:.2f}s jitter for request from {request_ip}")
-        await asyncio.sleep(jitter)
-    
     response = await call_next(request)
     return response
 
@@ -125,6 +128,36 @@ app.mount("/images_static", StaticFiles(directory="images", html=True), name="im
 
 # Include cache management router
 app.include_router(cache_manager.router)
+
+def consume_rate_token(ip: str) -> float:
+    """Take a token for this IP. Returns 0 if allowed, otherwise seconds until a token is available.
+
+    No awaits inside, so it is atomic within the event loop (no lock needed).
+    """
+    if RATE_LIMIT_SECONDS <= 0:
+        return 0.0
+    now = time.monotonic()
+
+    # Drop buckets that have fully refilled; they are equivalent to a fresh bucket
+    if len(rate_buckets) > BUCKET_PRUNE_THRESHOLD:
+        full_after = RATE_LIMIT_SECONDS * RATE_LIMIT_BURST
+        for key in [k for k, (_, ts) in rate_buckets.items() if now - ts >= full_after]:
+            del rate_buckets[key]
+
+    tokens, last = rate_buckets.get(ip, (float(RATE_LIMIT_BURST), now))
+    tokens = min(float(RATE_LIMIT_BURST), tokens + (now - last) / RATE_LIMIT_SECONDS)
+    if tokens < 1.0:
+        rate_buckets[ip] = (tokens, now)
+        return (1.0 - tokens) * RATE_LIMIT_SECONDS
+    rate_buckets[ip] = (tokens - 1.0, now)
+    return 0.0
+
+async def apply_jitter(ip: str) -> None:
+    """Randomly delay renders arriving near the start of a minute to avoid thundering-herd spikes."""
+    if JITTER_MAX_SECONDS > 0 and time.time() % 60 < JITTER_WINDOW_SECONDS:
+        jitter = random.uniform(0, JITTER_MAX_SECONDS)
+        logger.info(f"Applying {jitter:.2f}s jitter for request from {ip}")
+        await asyncio.sleep(jitter)
 
 def _read_bytes(path: str) -> bytes:
     with open(path, "rb") as f:
@@ -168,21 +201,9 @@ class RenderRequest(BaseModel):
     }
 )
 async def render_html(request: RenderRequest, req: Request):
-    global render_count, total_execution_time, last_request_time
+    global render_count, total_execution_time
     
     request_ip = req.state.ip
-
-    # Rate limiting with a lock to prevent race conditions on concurrent requests from the same IP
-    if RATE_LIMIT_SECONDS > 0:
-        async with rate_limit_lock:
-            current_time = time.time()
-            last_time = last_request_time.get(request_ip)
-            if last_time is not None and current_time - last_time < RATE_LIMIT_SECONDS:
-                raise HTTPException(
-                    status_code=429,
-                    detail=f"Too Many Requests. Only 1 request per {RATE_LIMIT_SECONDS} seconds is allowed."
-                )
-            last_request_time[request_ip] = current_time
 
     # Calculate hash of the request for caching
     req_dict = request.model_dump()
@@ -201,6 +222,19 @@ async def render_html(request: RenderRequest, req: Request):
         cached_bytes = await asyncio.to_thread(_read_bytes, file_path)
         logger.info(f"Returning cached image to {request_ip}: {req_hash}")
         return Response(content=cached_bytes, media_type="image/jpeg", status_code=203)
+
+    # Only real renders count against the rate limit (cache hits are cheap and free)
+    retry_after = consume_rate_token(request_ip)
+    if retry_after > 0:
+        wait = max(1, math.ceil(retry_after))
+        raise HTTPException(
+            status_code=429,
+            detail=f"Too Many Requests. Limit is 1 render per {RATE_LIMIT_SECONDS:g}s "
+                   f"(burst {RATE_LIMIT_BURST}). Retry in {wait}s.",
+            headers={"Retry-After": str(wait)}
+        )
+
+    await apply_jitter(request_ip)
 
     start_render = time.time()
 
