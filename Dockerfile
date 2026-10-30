@@ -1,10 +1,10 @@
+# syntax=docker/dockerfile:1
 FROM mcr.microsoft.com/playwright/python:v1.63.0-resolute
 
 WORKDIR /app
 
 COPY requirements.txt .
 
-# syntax=docker/dockerfile:1
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
     apt-get update && \

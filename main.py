@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from playwright.async_api import async_playwright
 import uvicorn
 import time
@@ -10,6 +10,7 @@ import logging
 import hashlib
 import json
 import os
+import re
 
 from contextlib import asynccontextmanager
 import asyncio
@@ -90,14 +91,20 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+def sanitize_ip(value: str) -> str:
+    """Make the client IP safe to use as a directory name (prevents path traversal via spoofed headers)."""
+    cleaned = re.sub(r"[^0-9A-Za-z.:_-]", "_", value or "")[:64].strip(".")
+    return cleaned or "unknown"
+
 @app.middleware("http")
 async def ip_check_middleware(request: Request, call_next):
     request_ip = (
         request.headers.get("cf-connecting-ip")
         or request.headers.get("x-forwarded-for", "").split(",")[0].strip()
-        or request.client.host
+        or (request.client.host if request.client else "unknown")
     )
-    request.state.ip = request_ip
+    request.state.ip = sanitize_ip(request_ip)
+    request_ip = request.state.ip
     
     if request_ip in IP_BLACKLIST:
         return Response(content="Forbidden", status_code=403)
@@ -119,10 +126,21 @@ app.mount("/images_static", StaticFiles(directory="images", html=True), name="im
 # Include cache management router
 app.include_router(cache_manager.router)
 
+def _read_bytes(path: str) -> bytes:
+    with open(path, "rb") as f:
+        return f.read()
+
+def _write_bytes(directory: str, path: str, data: bytes) -> None:
+    os.makedirs(directory, exist_ok=True)
+    tmp = f"{path}.tmp"
+    with open(tmp, "wb") as f:
+        f.write(data)
+    os.replace(tmp, path)  # atomic: concurrent readers never see partial files
+
 class RenderRequest(BaseModel):
     html: str
-    width: int = 240
-    height: int = 240
+    width: int = Field(240, ge=1, le=4096)
+    height: int = Field(240, ge=1, le=4096)
     cache: bool = True
 
 @app.post(
@@ -180,8 +198,7 @@ async def render_html(request: RenderRequest, req: Request):
 
     # Check if file exists in cache
     if (cache_enabled or SAVE_IMAGES) and os.path.exists(file_path):
-        with open(file_path, "rb") as f:
-            cached_bytes = f.read()
+        cached_bytes = await asyncio.to_thread(_read_bytes, file_path)
         logger.info(f"Returning cached image to {request_ip}: {req_hash}")
         return Response(content=cached_bytes, media_type="image/jpeg", status_code=203)
 
@@ -214,9 +231,7 @@ async def render_html(request: RenderRequest, req: Request):
 
                     # Save to disk if caching is enabled or SAVE_IMAGES is set
                     if cache_enabled or SAVE_IMAGES:
-                        os.makedirs(output_dir, exist_ok=True)
-                        with open(file_path, "wb") as f:
-                            f.write(screenshot_bytes)
+                        await asyncio.to_thread(_write_bytes, output_dir, file_path, screenshot_bytes)
 
                     # Update metrics atomically
                     async with metrics_lock:

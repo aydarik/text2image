@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Form, Depends, HTTPException, status
+from fastapi import APIRouter, Request, Form, Query, Depends, HTTPException, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
@@ -10,18 +10,25 @@ import secrets
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-security = HTTPBasic()
+security = HTTPBasic(auto_error=False)
 templates = Jinja2Templates(directory="templates")
 
 PAGE_SIZE = 60
 
 
-def check_auth(credentials: HTTPBasicCredentials = Depends(security)):
+def safe_ip(ip: str) -> str:
+    """Reduce user input to a single safe directory name ('all' for empty/traversal values)."""
+    ip = os.path.basename(ip or "")
+    return "all" if ip in ("", ".", "..") else ip
+
+
+def check_auth(credentials: HTTPBasicCredentials | None = Depends(security)):
     correct_password = os.getenv("CACHE_PASSWORD")
     if not correct_password:
         return True
 
-    if not secrets.compare_digest(credentials.password, correct_password):
+    if credentials is None or not secrets.compare_digest(
+            credentials.password.encode("utf-8"), correct_password.encode("utf-8")):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect password",
@@ -31,9 +38,9 @@ def check_auth(credentials: HTTPBasicCredentials = Depends(security)):
 
 
 @router.get("/cache", response_class=HTMLResponse)
-async def get_cache_manager(request: Request, page: int = 1, ip: str = "all", ajax: bool = False,
+async def get_cache_manager(request: Request, page: int = Query(1, ge=1), ip: str = "all", ajax: bool = False,
                             auth: bool = Depends(check_auth)):
-    ip = os.path.basename(ip)
+    ip = safe_ip(ip)
     output_dir = "images"
     os.makedirs(output_dir, exist_ok=True)
 
@@ -101,7 +108,7 @@ async def get_cache_manager(request: Request, page: int = 1, ip: str = "all", aj
 
 @router.post("/cache/clear")
 async def clear_cache(ip: str = Form("all"), auth: bool = Depends(check_auth)):
-    ip = os.path.basename(ip)
+    ip = safe_ip(ip)
     output_dir = "images"
 
     if not os.path.exists(output_dir):
